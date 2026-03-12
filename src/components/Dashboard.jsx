@@ -12,11 +12,11 @@ import {
     Shield,
     Network
 } from 'lucide-react';
-import MapView from './MapView';
+import LiveMap from './LiveMap';
 import AIInsights from './AIInsights';
 import AnalyticsPanel from './AnalyticsPanel';
 import TopStats from './TopStats';
-import GeoNotification from './GeoNotification';
+import GeoAlert from './GeoAlert';
 import KnowledgeGraph from './KnowledgeGraph';
 
 const Dashboard = () => {
@@ -204,7 +204,7 @@ const Dashboard = () => {
                                             exit={{ opacity: 0 }}
                                             className="h-full w-full"
                                         >
-                                            <MapView onGeoTrigger={handleGeoTrigger} />
+                                            <LiveMap onGeoTrigger={handleGeoTrigger} />
                                         </motion.div>
                                     ) : (
                                         <motion.div
@@ -279,7 +279,7 @@ const Dashboard = () => {
 
                 <AnimatePresence>
                     {showNotification && (
-                        <GeoNotification
+                        <GeoAlert
                             data={triggeredHospital}
                             onClose={() => setShowNotification(false)}
                         />

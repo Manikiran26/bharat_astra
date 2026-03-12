@@ -75,6 +75,77 @@ app.get('/api/hospitals', async (req, res) => {
     }
 });
 
+app.get('/api/nearby-places', async (req, res) => {
+    const { lat, lng } = req.query;
+
+    if (!lat || !lng) {
+        return res.status(400).json({ error: 'Latitude and Longitude are required' });
+    }
+
+    const locLat = parseFloat(lat);
+    const locLng = parseFloat(lng);
+
+    if (isNaN(locLat) || isNaN(locLng)) {
+        return res.status(400).json({ error: 'Invalid coordinates' });
+    }
+
+    const cacheKey = `${locLat.toFixed(2)}_${locLng.toFixed(2)}`;
+    const cachedData = cache.get(cacheKey);
+
+    if (cachedData) {
+        console.log(`[Cache Hit] Returning cached nearby places for ${cacheKey}`);
+        return res.json(cachedData);
+    }
+
+    try {
+        const apiKey = process.env.GEO_POSITION_API_KEY || process.env.GEOAPIFY_API_KEY;
+        if (!apiKey || apiKey === 'your_geoapify_key_here') {
+            throw new Error('Valid Geoapify API key is missing');
+        }
+
+        const radius = 5000; // 5km radius
+        const response = await axios.get('https://api.geoapify.com/v2/places', {
+            params: {
+                categories: 'healthcare.hospital,education.college,building.bridge',
+                filter: `circle:${locLng},${locLat},${radius}`,
+                limit: 50,
+                apiKey: apiKey
+            }
+        });
+
+        const features = response.data.features || [];
+        const places = features.map(feature => {
+            const categoriesArray = feature.properties.categories || [];
+            let formattedCategory = 'Infrastructure';
+
+            if (categoriesArray.some(c => c.includes('hospital'))) {
+                formattedCategory = 'Hospital';
+            } else if (categoriesArray.some(c => c.includes('college'))) {
+                formattedCategory = 'College';
+            } else if (categoriesArray.some(c => c.includes('bridge'))) {
+                formattedCategory = 'Bridge';
+            }
+
+            return {
+                id: feature.properties.place_id || Math.random().toString(36).substr(2, 9),
+                name: feature.properties.name || 'Unnamed Infrastructure',
+                lat: feature.geometry.coordinates[1],
+                lon: feature.geometry.coordinates[0],
+                address: feature.properties.address_line2 || feature.properties.formatted || 'Unknown Address',
+                category: formattedCategory,
+                distance: feature.properties.distance || 0
+            };
+        });
+
+        cache.set(cacheKey, places, 180); // 180 seconds = 3 minutes
+        console.log(`[Cache Miss] Fetched and cached nearby places for ${cacheKey}`);
+        res.json(places);
+    } catch (error) {
+        console.error('Error fetching nearby places:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Failed to fetch nearby places' });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
